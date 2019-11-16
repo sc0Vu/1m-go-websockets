@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
-	"syscall"
+
+	"github.com/gorilla/websocket"
 )
 
 var epoller *epoll
@@ -24,16 +24,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Increase resources limitations
-	var rLimit syscall.Rlimit
-	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
-		panic(err)
-	}
-	rLimit.Cur = rLimit.Max
-	if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit); err != nil {
-		panic(err)
-	}
-
+	setNofileRlimit()
 	// Enable pprof hooks
 	go func() {
 		if err := http.ListenAndServe("localhost:6060", nil); err != nil {

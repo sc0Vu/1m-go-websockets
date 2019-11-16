@@ -1,3 +1,5 @@
+// +build linux
+
 package main
 
 import (
@@ -11,7 +13,7 @@ import (
 
 type epoll struct {
 	fd          int
-	connections map[int]*websocket.Conn
+	connections map[int]net.Conn
 	lock        *sync.RWMutex
 }
 
@@ -23,11 +25,11 @@ func MkEpoll() (*epoll, error) {
 	return &epoll{
 		fd:          fd,
 		lock:        &sync.RWMutex{},
-		connections: make(map[int]*websocket.Conn),
+		connections: make(map[int]net.Conn),
 	}, nil
 }
 
-func (e *epoll) Add(conn *websocket.Conn) error {
+func (e *epoll) Add(conn net.Conn) error {
 	fd := websocketFD(conn)
 	err := unix.EpollCtl(e.fd, syscall.EPOLL_CTL_ADD, fd, &unix.EpollEvent{Events: unix.POLLIN | unix.POLLHUP, Fd: int32(fd)})
 	if err != nil {
@@ -42,7 +44,7 @@ func (e *epoll) Add(conn *websocket.Conn) error {
 	return nil
 }
 
-func (e *epoll) Remove(conn *websocket.Conn) error {
+func (e *epoll) Remove(conn net.Conn) error {
 	fd := websocketFD(conn)
 	err := unix.EpollCtl(e.fd, syscall.EPOLL_CTL_DEL, fd, nil)
 	if err != nil {
@@ -57,7 +59,7 @@ func (e *epoll) Remove(conn *websocket.Conn) error {
 	return nil
 }
 
-func (e *epoll) Wait() ([]*websocket.Conn, error) {
+func (e *epoll) Wait() ([]net.Conn, error) {
 	events := make([]unix.EpollEvent, 100)
 	n, err := unix.EpollWait(e.fd, events, 100)
 	if err != nil {
@@ -65,7 +67,7 @@ func (e *epoll) Wait() ([]*websocket.Conn, error) {
 	}
 	e.lock.RLock()
 	defer e.lock.RUnlock()
-	var connections []*websocket.Conn
+	var connections []net.Conn
 	for i := 0; i < n; i++ {
 		conn := e.connections[int(events[i].Fd)]
 		connections = append(connections, conn)
@@ -73,7 +75,7 @@ func (e *epoll) Wait() ([]*websocket.Conn, error) {
 	return connections, nil
 }
 
-func websocketFD(conn *websocket.Conn) int {
+func websocketFD(conn net.Conn) int {
 	connVal := reflect.Indirect(reflect.ValueOf(conn)).FieldByName("conn").Elem()
 	tcpConn := reflect.Indirect(connVal).FieldByName("conn")
 	fdVal := tcpConn.FieldByName("fd")
