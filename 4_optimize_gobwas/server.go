@@ -49,6 +49,7 @@ func main() {
 func Start() {
 	for {
 		connections, err := epoller.Wait()
+		log.Println("Call wait")
 		if err != nil {
 			log.Printf("Failed to epoll wait %v", err)
 			continue
