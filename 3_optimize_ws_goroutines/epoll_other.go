@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 package main
@@ -59,17 +60,14 @@ func (e *epoll) Add(conn *websocket.Conn) error {
 
 func (e *epoll) Remove(conn *websocket.Conn) error {
 	fd := websocketFD(conn)
-	e.changes = append(e.changes,
-		syscall.Kevent_t{
-			Ident: uint64(fd), Flags: syscall.EV_DELETE, Filter: syscall.EVFILT_READ,
-		},
-		syscall.Kevent_t{
-			Ident: uint64(fd), Flags: syscall.EV_DELETE, Filter: syscall.EVFILT_WRITE,
-		},
-	)
+	for i, change := range e.changes {
+		if change.Ident == uint64(fd) {
+			e.changes[i].Flags = syscall.EV_DELETE
+		}
+	}
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	e.connections[fd] = conn
+	delete(e.connections, fd)
 	if len(e.connections)%100 == 0 {
 		log.Printf("Total number of connections: %v", len(e.connections))
 	}
@@ -78,8 +76,16 @@ func (e *epoll) Remove(conn *websocket.Conn) error {
 
 func (e *epoll) Wait() ([]*websocket.Conn, error) {
 	events := make([]syscall.Kevent_t, 100)
-	n, err := syscall.Kevent(e.fd, e.changes, events, nil)
+	timeout := syscall.Timespec{
+		Sec:  0,
+		Nsec: 0,
+	}
+	n, err := syscall.Kevent(e.fd, e.changes, events, &timeout)
 	if err != nil {
+		if err == syscall.EINTR {
+			// timeout occurred
+			return nil, nil
+		}
 		return nil, err
 	}
 	e.lock.RLock()
@@ -88,6 +94,15 @@ func (e *epoll) Wait() ([]*websocket.Conn, error) {
 	for i := 0; i < n; i++ {
 		conn := e.connections[int(events[i].Ident)]
 		connections = append(connections, conn)
+	}
+	changes := []syscall.Kevent_t{}
+	for _, change := range e.changes {
+		if change.Flags == syscall.EV_ADD {
+			changes = append(changes, change)
+		}
+	}
+	if len(e.changes) != len(changes) {
+		e.changes = changes
 	}
 	return connections, nil
 }

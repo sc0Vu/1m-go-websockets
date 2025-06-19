@@ -49,7 +49,6 @@ func main() {
 func Start() {
 	for {
 		connections, err := epoller.Wait()
-		log.Println("Call wait")
 		if err != nil {
 			log.Printf("Failed to epoll wait %v", err)
 			continue
@@ -65,7 +64,7 @@ func Start() {
 				conn.Close()
 			} else {
 				// This is commented out since in demo usage, stdout is showing messages sent from > 1M connections at very high rate
-				//log.Printf("msg: %s", string(msg))
+				// log.Printf("msg: %s", string(msg))
 			}
 		}
 	}
