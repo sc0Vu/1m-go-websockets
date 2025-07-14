@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+    // Enable pprof
 	_ "net/http/pprof"
 
 	"github.com/gorilla/websocket"
@@ -25,12 +26,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	setNofileRlimit()
-	// Enable pprof hooks
-	go func() {
-		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
-			log.Fatalf("pprof failed: %v", err)
-		}
-	}()
 
 	// Start epoll
 	var err error
