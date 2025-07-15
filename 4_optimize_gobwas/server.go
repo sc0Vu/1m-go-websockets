@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
-    // Enable pprof
+	// Enable pprof
 	_ "net/http/pprof"
 
 	"github.com/gobwas/ws"
